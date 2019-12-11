@@ -26,7 +26,6 @@ class DummyGPU_singlet;
 class DummyCPU_singlet;
 const std::size_t BUFFER_SIZE = 1024;
 
-
 // sycl_task
 class sycl_task
 {
@@ -40,9 +39,6 @@ public:
     // Operation/task definition
     void operator()() const
     {
-        // Logging
-        std::cout << "sycl_task::" << m_name << " executing..." << std::endl;
-
         // Start the timer.
         auto start = std::chrono::high_resolution_clock::now();
 
@@ -81,6 +77,8 @@ public:
             // Run a calculation on the buffer.
             if (q_cpu && q_gpu)
             {
+                // Logging
+                std::cout << "sycl_task::" << m_name << " executing using:" << std::endl;
                 std::cout << " -- " << q_cpu->get_device().get_info<sycl::info::device::name>() << std::endl;
                 std::cout << " -- " << q_gpu->get_device().get_info<sycl::info::device::name>() << std::endl;
 
@@ -115,6 +113,8 @@ public:
             }                 // end GPU processing
             else if (q->get_device().is_gpu() || q->get_device().is_accelerator())
             {
+                // Logging
+                std::cout << "sycl_task::" << m_name << " executing using:" << std::endl;
                 std::cout << " -- " << q->get_device().get_info<sycl::info::device::name>() << std::endl;
 
                 // Loop
@@ -136,6 +136,8 @@ public:
             }                 // end GPU processing
             else if (q->get_device().is_cpu())
             {
+                // Logging
+                std::cout << "sycl_task::" << m_name << " executing using:" << std::endl;
                 std::cout << " -- " << q->get_device().get_info<sycl::info::device::name>() << std::endl;
 
                 // Loop
@@ -171,8 +173,7 @@ private:
     const std::size_t m_numEvents;
 }; // gpu_task
 
-
- // tbb_task
+// tbb_task
 class tbb_task
 {
 public:
@@ -215,38 +216,98 @@ private:
 }; // tbb_task
 
 // Main
-int main(int, char **)
+int main(int argc, char **argv)
 {
-    // Number of tasks to run in tbb::task_group
-    const std::size_t NUM_TASKS_CPUGPU = 0;
-    const std::size_t NUM_TASKS_GPU = 1;
-    const std::size_t NUM_TASKS_CPU = 1;
-    const std::size_t NUM_EVENTS_CPUGPU = 2;
-    const std::size_t NUM_EVENTS_GPU = 2;
-    const std::size_t NUM_EVENTS_CPU = 2;
+    int opt(0);
+    // Number of tasks/threads to run
+    std::size_t num_tasks(0);
+    // Number of tasks/threads to run both cpu and gpu
+    std::size_t num_tasks_cpugpu(0);
+    // Number of tasks/threads to run only cpu
+    std::size_t num_tasks_cpu(0);
+    // Number of tasks/threads to run only gpu
+    std::size_t num_tasks_gpu(0);
+    // Number of events per cpu+gpu thread
+    std::size_t num_events_cpugpu(2);
+    // Number of events per cpu thread
+    std::size_t num_events_cpu(2);
+    // Number of events per gpu thread
+    std::size_t num_events_gpu(2);
+    // Display help
+    bool help(false);
+
+    while ((opt = getopt(argc, argv, "hb:c:g:B:C:G:")) != -1)
+    {
+        switch (opt)
+        {
+        case 'b':
+            num_tasks_cpugpu = atoi(optarg);
+            break;
+        case 'c':
+            num_tasks_cpu = atoi(optarg);
+            break;
+        case 'g':
+            num_tasks_gpu = atoi(optarg);
+            break;
+        case 'B':
+            num_events_cpugpu = atoi(optarg);
+            break;
+        case 'C':
+            num_events_cpu = atoi(optarg);
+            break;
+        case 'G':
+            num_events_gpu = atoi(optarg);
+            break;
+        case 'h':
+            help = true;
+        default: /* '?' */
+            fprintf(stderr, "Usage: %s [-h] [-t NTHREADS] [-s ARRAY_SIZE] [-cgl] [-C ITER_CPU] [-G ITER_GPU] [-D CL_DEVICE]\n",
+                    argv[0]);
+            if (help)
+            {
+                printf("         -b n: run 'n' threads consisting of 'b'oth CPU and GPU kernels in each thread\n");
+                printf("         -c n: run 'n' threads consisting of 'c'pu-only kernels in each thread\n");
+                printf("         -g n: run 'n' threads consisting of 'g'pu-only kernels in each thread\n");
+                printf("         -B k: run 'k' kernels in 'B'oth cpu and gpu mode (-b)\n");
+                printf("         -C k: run 'k' kernels in 'C'pu-only mode (-c)\n");
+                printf("         -G k: run 'k' kernels in 'G'pu-only mode (-g)\n\n");
+            }
+
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // Define tbb::task_group for running CPU and GPU tasks
     tbb::task_group tg;
 
+    // Start the timer.
+    auto start = std::chrono::high_resolution_clock::now();
+
     // Execute the tasks.
-    for (std::size_t i = 0; i < NUM_TASKS_CPUGPU; ++i)  // CPU+GPU tasks
+    for (std::size_t i = 0; i < num_tasks_cpugpu; ++i) // CPU+GPU tasks
     {
         const std::string name = "CPU+GPU" + std::to_string(i);
-        tg.run(sycl_task(name, NUM_EVENTS_CPUGPU)); // spawn task and return
+        tg.run(sycl_task(name, num_events_cpugpu)); // spawn task and return
     }
-    for (std::size_t i = 0; i < NUM_TASKS_CPU; ++i)     // CPU-only tasks
+    for (std::size_t i = 0; i < num_tasks_cpu; ++i) // CPU-only tasks
     {
         const std::string name = "CPU" + std::to_string(i);
-        tg.run(sycl_task(name, NUM_EVENTS_CPU)); // spawn task and return
+        tg.run(sycl_task(name, num_events_cpu)); // spawn task and return
     }
-    for (std::size_t i = 0; i < NUM_TASKS_GPU; ++i)     // GPU-only tasks
+    for (std::size_t i = 0; i < num_tasks_gpu; ++i) // GPU-only tasks
     {
         const std::string name = "GPU" + std::to_string(i);
-        tg.run(sycl_task(name, NUM_EVENTS_GPU)); // spawn task and return
+        tg.run(sycl_task(name, num_events_gpu)); // spawn task and return
     }
     tg.wait(); // wait for tasks to complete
 
     std::cout << "========= ALL DONE =========" << std::endl;
+
+    // Stop the timer and print the result.
+    auto stop = std::chrono::high_resolution_clock::now();
+    std::cout << "Total execution time [ms]: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() / 1000
+              << std::endl;
 
     // Graceful exit.
     return 0;
