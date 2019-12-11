@@ -1,5 +1,5 @@
 # test_SYCL
-SYCL testing.
+Testing SYCL and DPC++.
 # Compiling and running
 ## Compiling
 ```
