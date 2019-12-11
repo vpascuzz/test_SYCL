@@ -33,4 +33,4 @@
 *.app
 
 # Directories
-./**/build/
+**/build
