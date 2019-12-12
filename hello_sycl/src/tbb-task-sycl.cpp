@@ -261,8 +261,7 @@ int main(int argc, char **argv)
         case 'h':
             help = true;
         default: /* '?' */
-            fprintf(stderr, "Usage: %s [-h] [-t NTHREADS] [-s ARRAY_SIZE] [-cgl] [-C ITER_CPU] [-G ITER_GPU] [-D CL_DEVICE]\n",
-                    argv[0]);
+            fprintf(stderr, "Usage: %s [-h] [-bcg N] [-BCG k]\n", argv[0]);
             if (help)
             {
                 printf("         -b n: run 'n' threads consisting of 'b'oth CPU and GPU kernels in each thread\n");
